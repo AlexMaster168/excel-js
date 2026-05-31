@@ -1,0 +1,255 @@
+@import "variables";
+@import "mixins";
+
+.excel__table {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: $header-height + $toolbar-height + $formula-height;
+  bottom: $sheet-tabs-height;
+  overflow: auto;
+  padding-bottom: 2px;
+
+  .row {
+    display: flex;
+    flex-direction: row;
+    min-height: 20px;
+    height: $row-height;
+  }
+
+  .row-info {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: $info-cell-width;
+    height: 100%;
+    border: 1px solid $border-color;
+    background: #f8f9fa;
+    border-top: none;
+  }
+
+  .row-data {
+    display: flex;
+  }
+
+  .column {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f8f9fa;
+    min-width: 40px;
+    width: $cell-width;
+    border: 1px solid $border-color;
+    border-top: 0;
+    border-left: 0;
+    height: 100%;
+  }
+
+  .cell {
+    min-width: 40px;
+    padding: 5px;
+    width: $cell-width;
+    height: 100%;
+    border: 1px solid #e2e3e3;
+    border-top: 0;
+    border-left: 0;
+    color: #111;
+    white-space: nowrap;
+    outline: none;
+
+
+    &.selected {
+      border: none;
+      outline: 2px solid $primary-color;
+      z-index: 2;
+    }
+  }
+
+  .column-add,
+  .row-add {
+    cursor: pointer;
+    color: $primary-color;
+    font-weight: bold;
+    user-select: none;
+
+    &:hover {
+      background: $primary-color;
+      color: #fff;
+    }
+  }
+
+  .column-add {
+    width: $info-cell-width;
+    min-width: $info-cell-width;
+    font-size: 18px;
+  }
+
+  .row-add {
+    font-size: 18px;
+  }
+
+  // --- объект-таблица (оформленный диапазон) ---
+  .cell.in-table {
+    background: #fff;
+  }
+
+  .cell.table-alt {
+    background: #eef3ff;
+  }
+
+  .cell.table-head {
+    background: $primary-color;
+    color: #fff;
+    font-weight: bold;
+  }
+
+  .cell.tb-top {
+    border-top: 2px solid $primary-color;
+  }
+
+  .cell.tb-bottom {
+    border-bottom: 2px solid $primary-color;
+  }
+
+  .cell.tb-left {
+    border-left: 2px solid $primary-color;
+  }
+
+  .cell.tb-right {
+    border-right: 2px solid $primary-color;
+  }
+
+  // --- слой графиков поверх листа ---
+  .table-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  // бейдж-ручка таблицы (за неё перетаскивают диапазон)
+  .table-badge {
+    position: absolute;
+    pointer-events: auto;
+    transform: translateY(-100%);
+    max-width: 160px;
+    padding: 1px 8px;
+    background: $primary-color;
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 4px 4px 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: grab;
+    user-select: none;
+    z-index: 60;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  // ячейка-цель при переносе таблицы
+  .cell.drop-target {
+    outline: 2px dashed $primary-color;
+    outline-offset: -2px;
+    background: #dbe6ff;
+  }
+
+  .chart-card {
+    position: absolute;
+    width: 320px;
+    background: #fff;
+    border: 1px solid $border-color;
+    border-radius: 8px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, .18);
+    pointer-events: auto;
+    overflow: hidden;
+
+    &.dragging {
+      opacity: .85;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+    }
+
+    &__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: #f8f9fa;
+      border-bottom: 1px solid $border-color;
+      cursor: grab;
+    }
+
+    &.dragging &__head {
+      cursor: grabbing;
+    }
+
+    &__title {
+      font-weight: bold;
+      color: #444;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &__close {
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      color: #999;
+      padding: 0 4px;
+
+      &:hover {
+        color: #e03131;
+      }
+    }
+
+    &__body {
+      padding: 6px;
+    }
+
+    .chart-svg {
+      display: block;
+    }
+  }
+
+  .col-resize, .row-resize {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: $primary-color;
+    opacity: 0;
+    z-index: 1000;
+
+    &:hover {
+      opacity: 1!important;
+    }
+  }
+
+  .col-resize {
+    top: 0;
+    width: 4px;
+
+    &:hover {
+      cursor: col-resize;
+    }
+  }
+
+  .row-resize {
+    left: 0;
+    height: 4px;
+
+    &:hover {
+      cursor: row-resize;
+    }
+  }
+
+}

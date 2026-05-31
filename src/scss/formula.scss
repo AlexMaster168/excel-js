@@ -1,0 +1,204 @@
+@import "variables";
+@import "mixins";
+
+
+.excel__formula {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: $header-height + $toolbar-height;
+  height: $formula-height;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid $border-color;
+
+  .info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-width: $info-cell-width;
+    font-size: 15px;
+    font-weight: bold;
+    font-style: italic;
+    color: #fff;
+    background: $primary-color;
+    border-right: 1px solid $border-color;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      filter: brightness(1.1);
+    }
+  }
+
+  .input {
+    padding: 4px;
+    font-size: 12px;
+    outline: none;
+    width: 100%;
+    height: 100%;
+    color: #000;
+  }
+
+  .formula__dialog {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 30;
+    display: none;
+    width: 520px;
+    max-width: 96vw;
+    background: #fff;
+    border: 1px solid $border-color;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+
+    &.open {
+      display: block;
+    }
+  }
+
+  .formula__dialog-head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border-bottom: 1px solid $border-color;
+  }
+
+  .formula__search {
+    height: 26px;
+    padding: 2px 8px;
+    font-size: 13px;
+    border: 1px solid $border-color;
+    border-radius: 3px;
+    outline: none;
+
+    &:focus {
+      border-color: $primary-color;
+    }
+  }
+
+  .formula__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .formula__tab {
+    padding: 3px 8px;
+    font-size: 11px;
+    color: #444;
+    background: #f1f3f4;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+
+    &:hover {
+      background: #e3e6e8;
+    }
+
+    &.active {
+      color: #fff;
+      background: $primary-color;
+    }
+  }
+
+  .formula__dialog-body {
+    display: flex;
+    height: 260px;
+  }
+
+  .formula__fnlist {
+    width: 55%;
+    overflow-y: auto;
+    border-right: 1px solid $border-color;
+  }
+
+  .formula__fn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    cursor: pointer;
+
+    .formula__fn-name {
+      font-weight: bold;
+      color: #000;
+    }
+
+    .formula__fn-cat {
+      font-size: 10px;
+      color: #999;
+    }
+
+    &:hover {
+      background: #f1f3f4;
+    }
+
+    &.active {
+      background: $primary-color;
+
+      .formula__fn-name,
+      .formula__fn-cat {
+        color: #fff;
+      }
+    }
+  }
+
+  .formula__empty {
+    padding: 16px 10px;
+    color: #999;
+    font-size: 12px;
+  }
+
+  .formula__fninfo {
+    width: 45%;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .formula__hint {
+    color: #999;
+    font-size: 12px;
+  }
+
+  .formula__info-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #000;
+  }
+
+  .formula__info-syntax {
+    margin: 6px 0;
+    padding: 6px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #1a3c8a;
+    background: #f1f3f4;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  .formula__info-desc {
+    font-size: 12px;
+    color: #555;
+    line-height: 1.4;
+  }
+
+  .formula__insert {
+    margin-top: 12px;
+    padding: 6px 12px;
+    color: #fff;
+    background: $primary-color;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+
+    &:hover {
+      opacity: .9;
+    }
+  }
+}

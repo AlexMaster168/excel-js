@@ -1,0 +1,41 @@
+@import "variables";
+
+.context-menu {
+  position: fixed;
+  z-index: 5000;
+  min-width: 180px;
+  padding: 4px 0;
+  background: #fff;
+  border: 1px solid $border-color;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+  font-size: 13px;
+  color: #333;
+  user-select: none;
+
+  &__item {
+    padding: 7px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      background: $primary-color;
+      color: #fff;
+    }
+
+    &.danger {
+      color: #e03131;
+
+      &:hover {
+        background: #e03131;
+        color: #fff;
+      }
+    }
+  }
+
+  &__divider {
+    height: 1px;
+    margin: 4px 0;
+    background: #eee;
+  }
+}
