@@ -54,6 +54,7 @@ export function createToolbar(s) {
     }
   ]
   const insert = [
+    {action: 'merge-cells', icon: 'call_merge', title: 'Объединить / разъединить ячейки'},
     {action: 'insert-table', icon: 'grid_on', title: 'Оформить как таблицу'},
     {action: 'chart-bar', icon: 'bar_chart', title: 'График: столбцы'},
     {action: 'chart-line', icon: 'show_chart', title: 'График: линия'},

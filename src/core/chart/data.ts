@@ -14,6 +14,11 @@ function cellText(sheet: SheetState, r: number, c: number): string {
   return String(evaluateCell(`${r}:${c}`, makeCtx(sheet)))
 }
 
+function isNumeric(sheet: SheetState, r: number, c: number): boolean {
+  const txt = cellText(sheet, r, c).replace(/\s/g, '').replace(',', '.')
+  return txt !== '' && !isNaN(Number(txt))
+}
+
 function cellNumber(sheet: SheetState, r: number, c: number): number {
   const txt = cellText(sheet, r, c).replace(/\s/g, '').replace(',', '.')
   const n = parseFloat(txt)
@@ -34,7 +39,10 @@ export function chartDataFromRange(
     // серии по строкам; подписи — первый столбец (если он не единственный)
     const hasLabelCol = width >= 2
     const valueCol = hasLabelCol ? c2 : c1
-    for (let r = r1; r <= r2; r++) {
+    // первая строка с текстом вместо числа — это шапка, в график не берём
+    const skipHead = hasLabelCol && height >= 3 &&
+      !isNumeric(sheet, r1, valueCol) && isNumeric(sheet, r1 + 1, valueCol)
+    for (let r = skipHead ? r1 + 1 : r1; r <= r2; r++) {
       const label = hasLabelCol
         ? cellText(sheet, r, c1)
         : (sheet.rowTitles[r] || String(r + 1))
@@ -45,7 +53,9 @@ export function chartDataFromRange(
     // серии по столбцам; подписи — первая строка (если она не единственная)
     const hasLabelRow = height >= 2
     const valueRow = hasLabelRow ? r2 : r1
-    for (let c = c1; c <= c2; c++) {
+    const skipHead = hasLabelRow && width >= 3 &&
+      !isNumeric(sheet, valueRow, c1) && isNumeric(sheet, valueRow, c1 + 1)
+    for (let c = skipHead ? c1 + 1 : c1; c <= c2; c++) {
       const label = hasLabelRow
         ? cellText(sheet, r1, c)
         : (sheet.colTitles[c] || colToLetters(c))

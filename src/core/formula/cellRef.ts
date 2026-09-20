@@ -30,7 +30,8 @@ export function colToLetters(col: number): string {
 
 /** "A1" -> {row:0, col:0}. Возвращает null при невалидной ссылке. */
 export function parseRef(ref: string): CellPos | null {
-  const m = /^([A-Za-z]+)(\d+)$/.exec(ref.trim())
+  // абсолютные ссылки ($A$1) трактуем как обычные
+  const m = /^\$?([A-Za-z]+)\$?(\d+)$/.exec(ref.trim())
   if (!m) {
     return null
   }

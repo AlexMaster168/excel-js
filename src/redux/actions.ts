@@ -8,6 +8,8 @@ import {
   TABLE_GROW,
   TABLE_DELETE,
   TABLE_INSERT,
+  MERGE_CELLS,
+  UNMERGE_CELLS,
   SET_ACTIVE_SHEET,
   ADD_SHEET,
   RENAME_SHEET,
@@ -32,6 +34,7 @@ import type {
   AppState,
   ApplyStyleData,
   AxisIndexData,
+  CellRange,
   CellStyles,
   ChangeTextData,
   GrowData,
@@ -150,4 +153,12 @@ export function pasteRange(data: PasteRangeData): Action {
 /** Полная замена состояния (используется undo/redo). */
 export function setState(state: AppState): Action {
   return {type: SET_STATE, data: state}
+}
+
+export function mergeCells(range: CellRange): Action {
+  return {type: MERGE_CELLS, data: range}
+}
+
+export function unmergeCells(range: CellRange): Action {
+  return {type: UNMERGE_CELLS, data: range}
 }

@@ -2,6 +2,7 @@
 // всех зависимых данных (ячейки, стили, размеры, заголовки, объекты-таблицы,
 // графики). Вынесено отдельно, чтобы покрыть тестами без UI и стора.
 
+import {shiftFormula} from '@core/formula/refShift'
 import type {CellRange, CellStyles, ClipCell, SheetState} from '@/redux/types'
 
 type Axis = 'row' | 'col'
@@ -99,6 +100,80 @@ function rangeAfterInsert(
     : {...range, c1: nLo, c2: nHi}
 }
 
+/** Переписывает ссылки во всех формулах листа. */
+function shiftFormulas(
+    data: Record<string, string>,
+    axis: Axis,
+    kind: 'insert' | 'delete',
+    index: number
+): Record<string, string> {
+  const next: Record<string, string> = {}
+  for (const id of Object.keys(data)) {
+    next[id] = shiftFormula(data[id], axis, kind, index)
+  }
+  return next
+}
+
+function isSingleCell(r: CellRange): boolean {
+  return r.r1 === r.r2 && r.c1 === r.c2
+}
+
+function intersects(a: CellRange, b: CellRange): boolean {
+  return a.r1 <= b.r2 && b.r1 <= a.r2 && a.c1 <= b.c2 && b.c1 <= a.c2
+}
+
+/** Расширяет прямоугольник выделения так, чтобы объединения не резались пополам. */
+export function expandToMerges(sheet: SheetState, range: CellRange): CellRange {
+  let cur = {...range}
+  for (let changed = true; changed;) {
+    changed = false
+    for (const m of sheet.merges || []) {
+      if (intersects(cur, m) && (m.r1 < cur.r1 || m.c1 < cur.c1 || m.r2 > cur.r2 || m.c2 > cur.c2)) {
+        cur = {
+          r1: Math.min(cur.r1, m.r1), c1: Math.min(cur.c1, m.c1),
+          r2: Math.max(cur.r2, m.r2), c2: Math.max(cur.c2, m.c2)
+        }
+        changed = true
+      }
+    }
+  }
+  return cur
+}
+
+/** Объединение, в которое входит ячейка (или undefined). */
+export function findMerge(sheet: SheetState, row: number, col: number): CellRange | undefined {
+  return (sheet.merges || []).find(m => row >= m.r1 && row <= m.r2 && col >= m.c1 && col <= m.c2)
+}
+
+/**
+ * Объединяет диапазон: остаётся значение левой-верхней ячейки, у остальных данные
+ * стираются (как в Excel). Пересекающиеся старые объединения заменяются новым.
+ */
+export function mergeRange(sheet: SheetState, range: CellRange): SheetState {
+  if (isSingleCell(range)) {
+    return sheet
+  }
+  const dataState = {...sheet.dataState}
+  for (let r = range.r1; r <= range.r2; r++) {
+    for (let c = range.c1; c <= range.c2; c++) {
+      if (r !== range.r1 || c !== range.c1) {
+        delete dataState[`${r}:${c}`]
+      }
+    }
+  }
+  return {
+    ...sheet,
+    dataState,
+    merges: [...(sheet.merges || []).filter(m => !intersects(m, range)), {...range}]
+  }
+}
+
+/** Разъединяет все объединения, пересекающие диапазон. */
+export function unmergeRange(sheet: SheetState, range: CellRange): SheetState {
+  const merges = (sheet.merges || []).filter(m => !intersects(m, range))
+  return merges.length === (sheet.merges || []).length ? sheet : {...sheet, merges}
+}
+
 /** Удаляет строку или столбец `index`, сдвигая всё что после. */
 export function deleteAxis(
     sheet: SheetState,
@@ -117,7 +192,7 @@ export function deleteAxis(
 
   return {
     ...sheet,
-    dataState: shiftCellMap(sheet.dataState, axis, shift),
+    dataState: shiftFormulas(shiftCellMap(sheet.dataState, axis, shift), axis, 'delete', index),
     stylesState: shiftCellMap(sheet.stylesState, axis, shift),
     [idxField]: shiftIndexMap(sheet[idxField], shift),
     [titleField]: shiftIndexMap(sheet[titleField], shift),
@@ -133,7 +208,10 @@ export function deleteAxis(
           const range = rangeAfterDelete(c.range, axis, index)
           return range ? {...c, range} : null
         })
-        .filter((c): c is NonNullable<typeof c> => c !== null)
+        .filter((c): c is NonNullable<typeof c> => c !== null),
+    merges: (sheet.merges || [])
+        .map(m => rangeAfterDelete(m, axis, index))
+        .filter((m): m is CellRange => m !== null && !isSingleCell(m))
   }
 }
 
@@ -150,7 +228,7 @@ export function insertAxis(
 
   return {
     ...sheet,
-    dataState: shiftCellMap(sheet.dataState, axis, shift),
+    dataState: shiftFormulas(shiftCellMap(sheet.dataState, axis, shift), axis, 'insert', index),
     stylesState: shiftCellMap(sheet.stylesState, axis, shift),
     [idxField]: shiftIndexMap(sheet[idxField], shift),
     [titleField]: shiftIndexMap(sheet[titleField], shift),
@@ -162,7 +240,8 @@ export function insertAxis(
     charts: sheet.charts.map(c => ({
       ...c,
       range: rangeAfterInsert(c.range, axis, index)
-    }))
+    })),
+    merges: (sheet.merges || []).map(m => rangeAfterInsert(m, axis, index))
   }
 }
 
@@ -211,10 +290,22 @@ export function moveRange(
       stylesState[key] = g.style
     }
   }
+  // объединения внутри диапазона едут вместе с ним; на месте назначения старые затираются
+  const target: CellRange = {
+    r1: range.r1 + dRow, c1: range.c1 + dCol, r2: range.r2 + dRow, c2: range.c2 + dCol
+  }
+  const inside = (m: CellRange) => m.r1 >= range.r1 && m.r2 <= range.r2 &&
+    m.c1 >= range.c1 && m.c2 <= range.c2
+  const merges = (sheet.merges || [])
+      .filter(m => inside(m) || !intersects(m, target))
+      .map(m => inside(m)
+        ? {r1: m.r1 + dRow, c1: m.c1 + dCol, r2: m.r2 + dRow, c2: m.c2 + dCol}
+        : m)
   return {
     ...sheet,
     dataState,
     stylesState,
+    merges,
     rowsCount: Math.max(sheet.rowsCount, range.r2 + dRow + 1),
     colsCount: Math.max(sheet.colsCount, range.c2 + dCol + 1)
   }
@@ -225,7 +316,8 @@ export function pasteRange(
     sheet: SheetState,
     row: number,
     col: number,
-    cells: ClipCell[][]
+    cells: ClipCell[][],
+    merges: CellRange[] = []
 ): SheetState {
   if (!cells.length) {
     return sheet
@@ -255,10 +347,20 @@ export function pasteRange(
       }
     })
   })
+  // блок целиком заменяет объединения под собой; скопированные приезжают со смещением
+  const block: CellRange = {
+    r1: row, c1: col, r2: row + cells.length - 1,
+    c2: col + Math.max(...cells.map(l => l.length)) - 1
+  }
+  const nextMerges = [
+    ...(sheet.merges || []).filter(m => !intersects(m, block)),
+    ...merges.map(m => ({r1: m.r1 + row, c1: m.c1 + col, r2: m.r2 + row, c2: m.c2 + col}))
+  ]
   return {
     ...sheet,
     dataState,
     stylesState,
+    merges: nextMerges,
     rowsCount: maxR + 1,
     colsCount: maxC + 1
   }

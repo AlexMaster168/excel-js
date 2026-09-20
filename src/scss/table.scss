@@ -157,6 +157,20 @@
   }
 
   // ячейка-цель при переносе таблицы
+  // --- объединённые ячейки ---
+  .cell.merged-master {
+    position: relative;
+    z-index: 1;
+    background: #fff;
+    overflow: hidden;
+    white-space: normal;
+  }
+
+  .cell.merged-hidden {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
   .cell.drop-target {
     outline: 2px dashed $primary-color;
     outline-offset: -2px;

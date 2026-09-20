@@ -1,8 +1,8 @@
 import {ExcelComponent} from '@core/ExcelComponent'
 import {$} from '@core/dom'
-import {changeTitle} from '@/redux/actions'
+import {changeTitle, importSheets} from '@/redux/actions'
 import {defaultTitle} from '@/constants'
-import {debounce, storage} from '@core/utils'
+import {debounce, storage, escapeHtml} from '@core/utils'
 import {ActiveRoute} from '@core/routes/ActiveRoute'
 import {parseXlsxFile} from '@core/xlsx/import'
 import {exportXlsx} from '@core/xlsx/export'
@@ -29,7 +29,7 @@ export class Header extends ExcelComponent {
   toHTML() {
     const title = this.store.getState().title || defaultTitle
     return `
-      <input type="text" class="input" value="${title}" />
+      <input type="text" class="input" value="${escapeHtml(title)}" />
       <div>
         <div class="button" data-button="undo" title="Отменить (Ctrl+Z)">
           <i data-button="undo" class="material-icons">undo</i>
@@ -62,16 +62,21 @@ export class Header extends ExcelComponent {
   }
 
   async onImportFile(event) {
-    const file = event.target.files && event.target.files[0]
+    const input = event.target
+    const file = input.files && input.files[0]
+    // сбрасываем value, иначе повторный выбор того же файла не вызовет change
+    input.value = ''
     if (!file) {
       return
     }
     try {
-      const {title, sheets} = await parseXlsxFile(file)
-      const key = storageName(ActiveRoute.param)
-      const existing = storage(key) || {}
-      storage(key, {...existing, title, sheets, activeSheet: 0})
-      // открываем таблицу заново из обновлённого состояния
+      const {title, sheets, warnings} = await parseXlsxFile(file)
+      if (warnings.length) {
+        alert(warnings.join('\n'))
+      }
+      // через стор, чтобы отложенное (debounce) сохранение не затёрло импорт старым состоянием
+      this.store.dispatch(importSheets({title, sheets}))
+      storage(storageName(ActiveRoute.param), this.store.getState())
       window.location.reload()
     } catch (e) {
       alert('Не удалось открыть файл: ' + (e && e.message ? e.message : e))

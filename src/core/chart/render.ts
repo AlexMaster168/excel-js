@@ -77,13 +77,15 @@ function xLabels(
 ): string {
   // показываем не больше ~8 подписей, чтобы не слипались
   const skip = Math.ceil(labels.length / 8)
+  // длина подписи по ширине слота (~5.5px на символ), не меньше 4 символов
+  const maxLen = Math.max(4, Math.floor(step * skip / 5.5))
   return labels
       .map((label, i) => {
         if (i % skip !== 0) {
           return ''
         }
         const x = box.x + offset + step * i
-        const text = escapeText(label.length > 6 ? label.slice(0, 6) : label)
+        const text = escapeText(label.length > maxLen ? label.slice(0, maxLen - 1) + '…' : label)
         return `<text x="${r2(x)}" y="${box.y + box.h + 14}"
           text-anchor="middle" font-size="9" fill="#868e96">${text}</text>`
       })

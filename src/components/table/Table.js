@@ -2,12 +2,16 @@ import {ExcelComponent} from '@core/ExcelComponent'
 import {$} from '@core/dom'
 import {createTable} from '@/components/table/table.template'
 import {resizeHandler} from '@/components/table/table.resize'
-import {isCell, matrix, nextSelector, shouldResize} from './table.functions'
+import {isCell, nextSelector, shouldResize} from './table.functions'
 import {TableSelection} from '@/components/table/TableSelection'
 import {showContextMenu, closeContextMenu} from '@/components/context-menu/contextMenu'
 import * as actions from '@/redux/actions'
 import {defaultStyles} from '@/constants'
+import {expandToMerges, findMerge} from '@/redux/sheetOps'
+import {promptDialog} from '@/components/dialog/promptDialog'
+import {escapeHtml} from '@core/utils'
 import {evaluateCell} from '@core/formula'
+import {translateFormula} from '@core/formula/refShift'
 
 export class Table extends ExcelComponent {
   static className = 'excel__table'
@@ -101,6 +105,7 @@ export class Table extends ExcelComponent {
       }))
     })
 
+    this.$on('toolbar:mergeCells', () => this.toggleMerge())
     this.$on('toolbar:insertTable', () => this.insertTable())
     this.$on('toolbar:insertChart', type => this.insertChart(type))
 
@@ -131,16 +136,35 @@ export class Table extends ExcelComponent {
       r2 = Math.max(r2, r)
       c2 = Math.max(c2, c)
     })
-    return {r1, c1, r2, c2}
+    // выделенное объединение (или его часть) считается целиком, как в Excel
+    return expandToMerges(this.activeSheet(), {r1, c1, r2, c2})
   }
 
-  insertTable() {
+  // объединить выделенный диапазон; если выделено готовое объединение — разъединить
+  toggleMerge() {
+    const range = this.selectionRange()
+    if (!range) {
+      return
+    }
+    const sheet = this.activeSheet()
+    const existing = findMerge(sheet, range.r1, range.c1)
+    const isSame = existing && existing.r1 === range.r1 && existing.c1 === range.c1 &&
+      existing.r2 === range.r2 && existing.c2 === range.c2
+    const single = range.r1 === range.r2 && range.c1 === range.c2
+    if (isSame || (single && existing)) {
+      this.applyOp(actions.unmergeCells(existing))
+    } else if (!single) {
+      this.applyOp(actions.mergeCells(range))
+    }
+  }
+
+  async insertTable() {
     const range = this.selectionRange()
     if (!range) {
       return
     }
     const count = this.activeSheet().tables.length + 1
-    const name = window.prompt('Название таблицы:', `Таблица ${count}`)
+    const name = await promptDialog('Название таблицы:', `Таблица ${count}`)
     if (name === null) {
       return
     }
@@ -198,6 +222,9 @@ export class Table extends ExcelComponent {
     try {
       const data = await resizeHandler(this.$root, event)
       this.$dispatch(actions.tableResize(data))
+      if ((this.activeSheet().merges || []).length) {
+        this.renderTable() // ширина/высота объединений считается от размеров ячеек
+      }
     } catch (e) {
       // resize отменён — молча игнорируем
     }
@@ -228,6 +255,15 @@ export class Table extends ExcelComponent {
     } else if (cell) {
       const [row, col] = cell.dataset.id.split(':').map(Number)
       items = [...this.rowMenu(row), {divider: true}, ...this.colMenu(col)]
+      const range = this.selectionRange()
+      const merged = findMerge(this.activeSheet(), row, col)
+      if (merged) {
+        items = [{label: 'Разъединить ячейки', onClick: () => this.applyOp(actions.unmergeCells(merged))},
+          {divider: true}, ...items]
+      } else if (range && (range.r1 !== range.r2 || range.c1 !== range.c2)) {
+        items = [{label: 'Объединить ячейки', onClick: () => this.applyOp(actions.mergeCells(range))},
+          {divider: true}, ...items]
+      }
       const objects = this.objectsAt(row, col)
       if (objects.length) {
         items = [...objects, {divider: true}, ...items]
@@ -246,7 +282,7 @@ export class Table extends ExcelComponent {
     return (sheet.tables || [])
         .filter(t => inRange(t.range))
         .map(t => ({
-          label: `Удалить таблицу «${t.name}»`,
+          label: `Удалить таблицу «${escapeHtml(t.name)}»`,
           danger: true,
           onClick: () => this.applyOp(actions.removeTable(t.id))
         }))
@@ -462,18 +498,14 @@ export class Table extends ExcelComponent {
     const selectAxis = (from, to) => {
       const lo = Math.min(from, to)
       const hi = Math.max(from, to)
+      const whole = axis === 'col'
+        ? {r1: 0, c1: lo, r2: sheet.rowsCount - 1, c2: hi}
+        : {r1: lo, c1: 0, r2: hi, c2: sheet.colsCount - 1}
+      const r = expandToMerges(sheet, whole)
       const $cells = []
-      if (axis === 'col') {
-        for (let c = lo; c <= hi; c++) {
-          for (let r = 0; r < sheet.rowsCount; r++) {
-            $cells.push(this.$root.find(`[data-id="${r}:${c}"]`))
-          }
-        }
-      } else {
-        for (let r = lo; r <= hi; r++) {
-          for (let c = 0; c < sheet.colsCount; c++) {
-            $cells.push(this.$root.find(`[data-id="${r}:${c}"]`))
-          }
+      for (let c = r.c1; c <= r.c2; c++) {
+        for (let row = r.r1; row <= r.r2; row++) {
+          $cells.push(this.$root.find(`[data-id="${row}:${c}"]`))
         }
       }
       const valid = $cells.filter($c => $c.$el)
@@ -527,13 +559,16 @@ export class Table extends ExcelComponent {
       const tline = []
       for (let c = range.c1; c <= range.c2; c++) {
         const id = `${r}:${c}`
-        line.push({value: sheet.dataState[id] || '', style: sheet.stylesState[id]})
+        line.push({value: sheet.dataState[id] || '', style: sheet.stylesState[id] || {}})
         tline.push(String(evaluateCell(id, ctx)))
       }
       cells.push(line)
       tsvRows.push(tline.join('\t'))
     }
-    this.clipboard = {cells}
+    const merges = (sheet.merges || [])
+        .filter(m => m.r1 >= range.r1 && m.r2 <= range.r2 && m.c1 >= range.c1 && m.c2 <= range.c2)
+        .map(m => ({r1: m.r1 - range.r1, c1: m.c1 - range.c1, r2: m.r2 - range.r1, c2: m.c2 - range.c1}))
+    this.clipboard = {cells, merges, row: range.r1, col: range.c1}
     this.lastCopiedTsv = tsvRows.join('\n')
     if (e.clipboardData) {
       e.clipboardData.setData('text/plain', this.lastCopiedTsv)
@@ -547,9 +582,18 @@ export class Table extends ExcelComponent {
     }
     e.preventDefault()
     const text = e.clipboardData ? e.clipboardData.getData('text/plain') : ''
+    const [row, col] = this.selection.current.id().split(':').map(Number)
     let cells
+    let merges = []
     if (this.clipboard && text === this.lastCopiedTsv) {
-      cells = this.clipboard.cells // внутренний буфер: формулы и стили
+      merges = this.clipboard.merges
+      // внутренний буфер: формулы (со сдвигом относительных ссылок) и стили
+      const dRow = row - this.clipboard.row
+      const dCol = col - this.clipboard.col
+      cells = this.clipboard.cells.map(line => line.map(c => ({
+        ...c,
+        value: translateFormula(c.value, dRow, dCol)
+      })))
     } else if (text) {
       cells = text.replace(/\r/g, '').split('\n')
           .map(line => line.split('\t').map(v => ({value: v})))
@@ -560,14 +604,31 @@ export class Table extends ExcelComponent {
     } else {
       return
     }
-    const [row, col] = this.selection.current.id().split(':').map(Number)
-    this.applyOp(actions.pasteRange({row, col, cells}))
+    this.applyOp(actions.pasteRange({row, col, cells, merges}))
+  }
+
+  // id ячеек прямоугольника между двумя ячейками, расширенного до границ объединений
+  rectIds($a, $b) {
+    const a = $a.id(true)
+    const b = $b.id(true)
+    const r = expandToMerges(this.activeSheet(), {
+      r1: Math.min(a.row, b.row), c1: Math.min(a.col, b.col),
+      r2: Math.max(a.row, b.row), c2: Math.max(a.col, b.col)
+    })
+    const ids = []
+    for (let c = r.c1; c <= r.c2; c++) {
+      for (let row = r.r1; row <= r.r2; row++) {
+        ids.push(`${row}:${c}`)
+      }
+    }
+    return ids
   }
 
   // выделяет прямоугольник от якоря (current) до $target
   selectTo($target) {
-    const $cells = matrix($target, this.selection.current)
+    const $cells = this.rectIds($target, this.selection.current)
         .map(id => this.$root.find(`[data-id="${id}"]`))
+        .filter($c => $c.$el)
     this.selection.selectGroup($cells)
   }
 
@@ -581,8 +642,9 @@ export class Table extends ExcelComponent {
         return
       }
       moved = true
-      const $cells = matrix($anchor, $(cell))
+      const $cells = this.rectIds($anchor, $(cell))
           .map(id => this.$root.find(`[data-id="${id}"]`))
+          .filter($c => $c.$el)
       this.selection.selectGroup($cells)
     }
     const onUp = () => {
@@ -617,10 +679,31 @@ export class Table extends ExcelComponent {
         return
       }
       event.preventDefault()
-      const id = this.selection.current.id(true)
-      const $next = this.$root.find(nextSelector(key, id))
-      this.selectCell($next)
+      const id = this.mergeAwarePos(key, this.selection.current.id(true))
+      let $next = this.$root.find(nextSelector(key, id))
+      // за краем листа ячейки нет — остаёмся на месте (иначе падение на null)
+      if ($next.$el) {
+        // попали в скрытую часть объединения -> выделяем его главную ячейку
+        const {row, col} = $next.id(true)
+        const m = findMerge(this.activeSheet(), row, col)
+        if (m && (row !== m.r1 || col !== m.c1)) {
+          $next = this.$root.find(`[data-id="${m.r1}:${m.c1}"]`)
+        }
+        this.selectCell($next)
+      }
     }
+  }
+
+  // точка, от которой считаем шаг стрелки: выход за край объединения и привязка
+  // цели к главной ячейке объединения (скрытые ячейки выделять нельзя)
+  mergeAwarePos(key, {row, col}) {
+    const sheet = this.activeSheet()
+    const m = findMerge(sheet, row, col)
+    if (m) {
+      if (key === 'Enter' || key === 'ArrowDown') row = m.r2
+      if (key === 'Tab' || key === 'ArrowRight') col = m.c2
+    }
+    return {row, col}
   }
 
   updateTextInStore(value) {

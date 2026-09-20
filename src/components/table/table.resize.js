@@ -1,13 +1,13 @@
 import {$} from '@core/dom'
 
 export function resizeHandler($root, event) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const $resizer = $(event.target)
     const $parent = $resizer.closest('[data-type="resizable"]')
     const coords = $parent.getCoords()
     const type = $resizer.data.resize
     const sideProp = type === 'col' ? 'bottom' : 'right'
-    let value
+    let value = null
 
     $resizer.css({
       opacity: 1,
@@ -29,6 +29,13 @@ export function resizeHandler($root, event) {
     document.onmouseup = () => {
       document.onmousemove = null
       document.onmouseup = null
+      if (value === null) {
+        // клик без движения — размер не меняем
+        reject()
+        $resizer.css({opacity: 0, bottom: 0, right: 0})
+        return
+      }
+      value = Math.max(value, type === 'col' ? 20 : 12)
       if (type === 'col') {
         $parent.css({width: value + 'px'})
         $root.findAll(`[data-col="${$parent.data.col}"]`)

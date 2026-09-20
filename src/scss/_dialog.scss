@@ -1,0 +1,61 @@
+@import "variables";
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .3);
+}
+
+.dialog {
+  width: 320px;
+  padding: 18px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+
+  &__title {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #333;
+  }
+
+  &__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid $border-color;
+    border-radius: 4px;
+    font-size: 14px;
+    outline: none;
+
+    &:focus {
+      border-color: $primary-color;
+    }
+  }
+
+  &__buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  &__btn {
+    padding: 6px 16px;
+    border: 1px solid $border-color;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+
+    &--primary {
+      border-color: $primary-color;
+      background: $primary-color;
+      color: #fff;
+    }
+  }
+}

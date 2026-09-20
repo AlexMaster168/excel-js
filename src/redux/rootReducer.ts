@@ -23,11 +23,13 @@ import {
   REMOVE_CHART,
   MOVE_CHART,
   PASTE_RANGE,
+  MERGE_CELLS,
+  UNMERGE_CELLS,
   SET_STATE
 } from '@/redux/types'
 import type {Action, AppState, SheetState} from '@/redux/types'
 import {emptySheet} from '@/redux/initialState'
-import {deleteAxis, insertAxis, moveRange, pasteRange} from '@/redux/sheetOps'
+import {deleteAxis, insertAxis, mergeRange, moveRange, pasteRange, unmergeRange} from '@/redux/sheetOps'
 import {genId} from '@/redux/actions'
 import {clone} from '@core/utils'
 
@@ -114,7 +116,12 @@ export function rootReducer(state: AppState, action: Action): AppState {
       return {...state, activeSheet: idx}
     }
     case ADD_SHEET: {
-      const name = `Лист${state.sheets.length + 1}`
+      const taken = new Set(state.sheets.map(s => s.name.toLowerCase()))
+      let n = state.sheets.length + 1
+      while (taken.has(`лист${n}`)) {
+        n++
+      }
+      const name = `Лист${n}`
       return {
         ...state,
         sheets: [...state.sheets, emptySheet(name)],
@@ -220,12 +227,20 @@ export function rootReducer(state: AppState, action: Action): AppState {
         }
         return {
           ...moved,
-          tables: moved.tables.map(x => (x.id === action.data.id ? {...x, range} : x))
+          tables: moved.tables.map(x => (x.id === action.data.id ? {...x, range} : x)),
+          // график, построенный ровно по этой таблице, едет вместе с ней
+          charts: moved.charts.map(c => JSON.stringify(c.range) === JSON.stringify(t.range)
+            ? {...c, range}
+            : c)
         }
       })
     case PASTE_RANGE:
       return updateActiveSheet(state, s =>
-        pasteRange(s, action.data.row, action.data.col, action.data.cells))
+        pasteRange(s, action.data.row, action.data.col, action.data.cells, action.data.merges))
+    case MERGE_CELLS:
+      return updateActiveSheet(state, s => mergeRange(s, action.data))
+    case UNMERGE_CELLS:
+      return updateActiveSheet(state, s => unmergeRange(s, action.data))
     case SET_STATE:
       // полная замена (undo/redo) — состояние уже валидный снимок
       return action.data

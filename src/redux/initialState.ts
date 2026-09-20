@@ -21,7 +21,8 @@ export function emptySheet(name = defaultSheetName): SheetState {
     colTitles: {},
     rowTitles: {},
     tables: [],
-    charts: []
+    charts: [],
+    merges: []
   }
 }
 

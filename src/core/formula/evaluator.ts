@@ -5,6 +5,7 @@ import {
   compareValues,
   errToString,
   formatValue,
+  toBoolean,
   toNumber,
   toText
 } from '@core/formula/values'
@@ -44,6 +45,9 @@ function tokenize(input: string): Token[] {
       tokens.push({type: 'NUMBER', value: num})
       continue
     }
+    if (input.startsWith('#REF!', i)) {
+      throw new FormulaError('REF', 'Reference was deleted')
+    }
     if (ch === '"') {
       i++
       let s = ''
@@ -58,9 +62,9 @@ function tokenize(input: string): Token[] {
       tokens.push({type: 'STRING', value: s})
       continue
     }
-    if (/[A-Za-zА-Яа-я_]/.test(ch)) {
+    if (/[A-Za-zА-Яа-я_$]/.test(ch)) {
       let name = ''
-      while (i < input.length && /[A-Za-zА-Яа-я0-9_.]/.test(input[i])) {
+      while (i < input.length && /[A-Za-zА-Яа-я0-9_.$]/.test(input[i])) {
         name += input[i]
         i++
       }
@@ -273,18 +277,60 @@ class Parser {
     }
     this.pos += 2 // NAME + LPAREN
     const args: FormulaValue[][] = []
+    const lazy = name === 'IF'
+    const errors: Array<unknown> = []
+    // у IF ошибка в невыбранной ветке не должна ломать результат: IF(B1=0;0;A1/B1)
+    const arg = () => {
+      if (!lazy) {
+        return this.parseArg()
+      }
+      const start = this.pos
+      try {
+        errors[args.length] = undefined
+        return this.parseArg()
+      } catch (e) {
+        if (!(e instanceof FormulaError)) {
+          throw e
+        }
+        errors[args.length] = e
+        this.pos = start
+        this.skipArg()
+        return [0]
+      }
+    }
     if (this.peek()?.type !== 'RPAREN') {
-      args.push(this.parseArg())
+      args.push(arg())
       while (this.peek()?.type === 'ARGSEP') {
         this.pos++
-        args.push(this.parseArg())
+        args.push(arg())
       }
     }
     if (this.peek()?.type !== 'RPAREN') {
       throw new FormulaError('ERROR', 'Expected )')
     }
     this.pos++
+    if (lazy) {
+      // ошибка в условии — всегда ошибка; в ветке — только если ветка выбрана
+      const chosen = errors[0] ? 0 : toBoolean(args[0][0]) ? 1 : 2
+      if (errors[chosen]) {
+        throw errors[chosen]
+      }
+    }
     return fn.apply(args)
+  }
+
+  // пропускает токены аргумента до ',' или ')' на нулевой глубине скобок
+  private skipArg(): void {
+    let depth = 0
+    while (this.pos < this.tokens.length) {
+      const t = this.tokens[this.pos].type
+      if (t === 'LPAREN') depth++
+      else if (t === 'RPAREN') {
+        if (depth === 0) return
+        depth--
+      } else if (t === 'ARGSEP' && depth === 0) return
+      this.pos++
+    }
   }
 
   // один аргумент функции -> массив значений (диапазон даёт много)

@@ -1,4 +1,4 @@
-import {toInlineStyles} from '@core/utils'
+import {toInlineStyles, escapeHtml} from '@core/utils'
 import {defaultStyles, defaultCols, defaultRows} from '@/constants'
 import {evaluateCell, colToLetters} from '@core/formula'
 import {renderChartSvg} from '@core/chart/render'
@@ -48,8 +48,40 @@ function tableBadges(tables) {
   return tables
       .map(t => `<span class="table-badge" data-table-move="${t.id}"
         data-anchor="${t.range.r1}:${t.range.c1}"
-        title="Перетащить таблицу «${t.name}»">${t.name}</span>`)
+        title="Перетащить таблицу «${escapeHtml(t.name)}»">${escapeHtml(t.name)}</span>`)
       .join('')
+}
+
+function widthPx(state, index) {
+  return state[index] || DEFAULT_WIDTH
+}
+
+function heightPx(state, index) {
+  return state[index] || DEFAULT_HEIGHT
+}
+
+// стиль/класс ячейки в объединении. Главная ячейка (левая-верхняя) занимает в потоке
+// свой слот (отрицательный margin-right), а рисуется на всю площадь объединения;
+// остальные ячейки диапазона остаются в потоке, но невидимы.
+function mergeInfo(sheet, row, col) {
+  for (const m of sheet.merges || []) {
+    if (!inRange(m, row, col)) {
+      continue
+    }
+    if (row !== m.r1 || col !== m.c1) {
+      return {cls: 'merged-hidden', style: ''}
+    }
+    let w = 0
+    for (let c = m.c1; c <= m.c2; c++) w += widthPx(sheet.colState, c)
+    let h = 0
+    for (let r = m.r1; r <= m.r2; r++) h += heightPx(sheet.rowState, r)
+    const own = widthPx(sheet.colState, col)
+    return {
+      cls: 'merged-master',
+      style: `; flex: none; width: ${w}px; height: ${h}px; margin-right: ${own - w}px`
+    }
+  }
+  return {cls: '', style: ''}
 }
 
 function toCell(sheet, row) {
@@ -63,7 +95,8 @@ function toCell(sheet, row) {
       ...defaultStyles,
       ...sheet.stylesState[id]
     })
-    const extra = tableClasses(tables, row, col)
+    const merge = mergeInfo(sheet, row, col)
+    const extra = `${tableClasses(tables, row, col)} ${merge.cls}`
     return `
       <div
         class="cell ${extra}"
@@ -71,9 +104,9 @@ function toCell(sheet, row) {
         data-col="${col}"
         data-type="cell"
         data-id="${id}"
-        data-value="${data || ''}"
-        style="${styles}; width: ${width}"
-      >${evaluateCell(id, ctx)}</div>
+        data-value="${escapeHtml(data)}"
+        style="${styles}; width: ${width}${merge.style}"
+      >${escapeHtml(evaluateCell(id, ctx))}</div>
     `
   }
 }
@@ -86,7 +119,7 @@ function toColumn({title, index, width}) {
       data-col="${index}"
       style="width: ${width}"
     >
-      <span class="col-title" data-col-header data-col="${index}">${title}</span>
+      <span class="col-title" data-col-header data-col="${index}">${escapeHtml(title)}</span>
       <div class="col-resize" data-resize="col"></div>
     </div>
   `
@@ -99,7 +132,7 @@ function createRow(rowIndex, content, sheet) {
     ? '<div class="row-resize" data-resize="row"></div>'
     : ''
   const height = isData ? getHeight(sheet.rowState, rowIndex) : DEFAULT_HEIGHT + 'px'
-  const display = isData ? (sheet.rowTitles[rowIndex] || (rowIndex + 1)) : ''
+  const display = isData ? escapeHtml(sheet.rowTitles[rowIndex] || (rowIndex + 1)) : ''
   const rowHeader = isData
     ? `<span class="row-title" data-row-header data-row="${rowIndex}">${display}</span>`
     : ''
@@ -150,7 +183,7 @@ function chartsOverlay(sheet) {
           <div class="chart-card" data-chart="${chart.id}"
                style="left:${left}px; top:${top}px">
             <div class="chart-card__head" data-chart-head="${chart.id}">
-              <span class="chart-card__title" title="${label}">${label}</span>
+              <span class="chart-card__title" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
               <span class="chart-card__close" data-action="remove-chart"
                     data-chart="${chart.id}" title="Удалить график">&times;</span>
             </div>

@@ -65,3 +65,16 @@ export function clone<T>(obj: T): T {
 export function preventDefault(event: Event): void {
   event.preventDefault()
 }
+
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+}
+
+/** Экранирует текст для вставки в HTML (содержимое и значения атрибутов). */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, ch => HTML_ESCAPES[ch])
+}

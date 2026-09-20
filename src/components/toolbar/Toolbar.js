@@ -39,7 +39,9 @@ export class Toolbar extends ExcelStateComponent {
       return
     }
     const action = event.target.dataset.action
-    if (action === 'insert-table') {
+    if (action === 'merge-cells') {
+      this.$emit('toolbar:mergeCells')
+    } else if (action === 'insert-table') {
       this.$emit('toolbar:insertTable')
     } else if (action === 'chart-bar') {
       this.$emit('toolbar:insertChart', 'bar')

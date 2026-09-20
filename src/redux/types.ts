@@ -23,6 +23,8 @@ export const ADD_CHART = 'ADD_CHART'
 export const REMOVE_CHART = 'REMOVE_CHART'
 export const MOVE_CHART = 'MOVE_CHART'
 export const PASTE_RANGE = 'PASTE_RANGE'
+export const MERGE_CELLS = 'MERGE_CELLS'
+export const UNMERGE_CELLS = 'UNMERGE_CELLS'
 export const SET_STATE = 'SET_STATE'
 
 /** Инлайновые стили ячейки. */
@@ -79,6 +81,8 @@ export interface SheetState {
   rowTitles: Record<string, string>
   tables: TableObject[]
   charts: ChartObject[]
+  /** Объединённые ячейки: левая-верхняя — главная, остальные скрыты. */
+  merges: CellRange[]
 }
 
 /** Документ: несколько листов + общие поля. */
@@ -165,6 +169,8 @@ export interface PasteRangeData {
   row: number
   col: number
   cells: ClipCell[][]
+  /** Объединения скопированного блока (координаты относительно его угла). */
+  merges?: CellRange[]
 }
 
 // --- Discriminated union всех экшенов ---
@@ -194,4 +200,6 @@ export type Action =
   | {type: typeof REMOVE_CHART; data: string}
   | {type: typeof MOVE_CHART; data: MoveChartData}
   | {type: typeof PASTE_RANGE; data: PasteRangeData}
+  | {type: typeof MERGE_CELLS; data: CellRange}
+  | {type: typeof UNMERGE_CELLS; data: CellRange}
   | {type: typeof SET_STATE; data: AppState}

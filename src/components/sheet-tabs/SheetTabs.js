@@ -1,6 +1,7 @@
 import {ExcelComponent} from '@core/ExcelComponent'
 import {showContextMenu, closeContextMenu} from '@/components/context-menu/contextMenu'
 import * as actions from '@/redux/actions'
+import {escapeHtml} from '@core/utils'
 
 export class SheetTabs extends ExcelComponent {
   static className = 'excel__sheet-tabs'
@@ -17,7 +18,7 @@ export class SheetTabs extends ExcelComponent {
   tabsHTML(state) {
     const tabs = state.sheets.map((s, i) => `
       <div class="sheet-tab ${i === state.activeSheet ? 'active' : ''}"
-           data-sheet="${i}" title="${s.name}">${s.name}</div>
+           data-sheet="${i}" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</div>
     `).join('')
     return `
       ${tabs}

@@ -1,16 +1,21 @@
-import { storage } from "../core/utils"
+import { storage, escapeHtml } from "../core/utils"
 
 function toHTML(key){
-    const model = storage(key)
+    let model = null
+    try {
+        model = storage(key)
+    } catch (e) {
+        model = null // битый JSON в localStorage не должен ронять дашборд
+    }
     // Ключ хранится как 'excel' + id (без двоеточия) — раньше split(':') давал undefined.
     const id = key.replace('excel', '')
-    if(!model){
+    if(!model || typeof model !== 'object'){
         return ''
     }
     return `
 
     <li class="db__record">
-        <a href="#excel/${id}">${model.title}</a>
+        <a href="#excel/${encodeURIComponent(id)}">${escapeHtml(model.title)}</a>
         <strong>${new Date(model.openedDate).toLocaleDateString()}</strong>
     </li>
     `
@@ -20,7 +25,7 @@ function getAllKeys(){
     const keys = []
     for(let i = 0; i < localStorage.length; i++){
         const key = localStorage.key(i)
-        if(!key.includes('excel')){
+        if(!key.startsWith('excel')){
             continue
         }
         keys.push(key)

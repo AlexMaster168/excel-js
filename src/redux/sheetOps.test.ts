@@ -167,3 +167,49 @@ describe('pasteRange', () => {
     expect(cleared.dataState['0:0']).toBeUndefined()
   })
 })
+
+import {findMerge, mergeRange, unmergeRange} from '@/redux/sheetOps'
+describe('merge', () => {
+  const base = () => {
+    const s = emptySheet()
+    s.dataState = {'0:0': 'a', '0:1': 'b', '1:0': 'c'}
+    return s
+  }
+  it('оставляет значение левой-верхней, остальное стирает', () => {
+    const m = mergeRange(base(), {r1: 0, c1: 0, r2: 1, c2: 1})
+    expect(m.dataState).toEqual({'0:0': 'a'})
+    expect(findMerge(m, 1, 1)).toEqual({r1: 0, c1: 0, r2: 1, c2: 1})
+    expect(findMerge(m, 2, 2)).toBeUndefined()
+  })
+  it('одна ячейка — no-op; unmerge снимает', () => {
+    const s = base()
+    expect(mergeRange(s, {r1: 0, c1: 0, r2: 0, c2: 0})).toBe(s)
+    const m = mergeRange(s, {r1: 0, c1: 0, r2: 0, c2: 1})
+    expect(unmergeRange(m, {r1: 0, c1: 1, r2: 0, c2: 1}).merges).toEqual([])
+  })
+  it('вставка внутри растягивает, удаление сжимает и схлопывает', () => {
+    const m = mergeRange(base(), {r1: 0, c1: 0, r2: 1, c2: 1})
+    expect(insertAxis(m, 'row', 1).merges[0]).toEqual({r1: 0, c1: 0, r2: 2, c2: 1})
+    expect(deleteAxis(m, 'row', 1).merges).toEqual([{r1: 0, c1: 0, r2: 0, c2: 1}])
+    expect(deleteAxis(deleteAxis(m, 'row', 1), 'col', 1).merges).toEqual([])
+  })
+})
+
+import {expandToMerges} from '@/redux/sheetOps'
+describe('merge: выделение, перенос, вставка', () => {
+  const merged = () => mergeRange(emptySheet(), {r1: 1, c1: 1, r2: 2, c2: 2})
+  it('expandToMerges цепляет объединение целиком', () => {
+    expect(expandToMerges(merged(), {r1: 0, c1: 0, r2: 1, c2: 1})).toEqual({r1: 0, c1: 0, r2: 2, c2: 2})
+    expect(expandToMerges(merged(), {r1: 5, c1: 5, r2: 6, c2: 6})).toEqual({r1: 5, c1: 5, r2: 6, c2: 6})
+  })
+  it('moveRange двигает объединения внутри диапазона', () => {
+    const s = moveRange(merged(), {r1: 0, c1: 0, r2: 3, c2: 3}, 2, 1)
+    expect(s.merges).toEqual([{r1: 3, c1: 2, r2: 4, c2: 3}])
+  })
+  it('pasteRange переносит объединения со смещением и затирает старые', () => {
+    const s = pasteRange(merged(), 5, 5, [[{value: 'a'}, {value: ''}]], [{r1: 0, c1: 0, r2: 0, c2: 1}])
+    expect(s.merges).toContainEqual({r1: 5, c1: 5, r2: 5, c2: 6})
+    const over = pasteRange(merged(), 0, 0, [[{value: 'x'}, {value: 'y'}], [{value: 'z'}, {value: 'w'}]])
+    expect(over.merges).toEqual([])
+  })
+})
