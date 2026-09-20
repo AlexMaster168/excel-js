@@ -138,6 +138,9 @@ pnpm test:watch   # тесты в watch-режиме
 листа (сдвиг, перенос, вставка, объединения) вынесена в чистые функции `redux/sheetOps.ts`,
 а перепись ссылок — в `core/formula/refShift.ts`. Обе части покрыты тестами без UI.
 
+Импорты идут через алиасы `@` → `src` и `@core` → `src/core` (заданы в `vite.config.ts` и
+`tsconfig.json` через `paths`, без устаревшего `baseUrl`).
+
 ```
 src/
 ├── core/                 # фреймворк и движки (TypeScript)

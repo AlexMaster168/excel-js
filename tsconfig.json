@@ -25,10 +25,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
 
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@core/*": ["src/core/*"]
+      "@/*": ["./src/*"],
+      "@core/*": ["./src/core/*"]
     }
   },
   "include": ["src", "vite.config.ts"]
